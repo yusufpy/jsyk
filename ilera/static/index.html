@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ilera — Field Triage</title>
+<style>
+  :root {
+    --ink: #16231f;
+    --paper: #f6f4ee;
+    --clinical-green: #2f5d50;
+    --clinical-green-dark: #1e3f36;
+    --alert-amber: #b5720b;
+    --alert-red: #9c2c2c;
+    --line: #cfcabd;
+    --card: #ffffff;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Georgia', 'Iowan Old Style', serif;
+    line-height: 1.5;
+  }
+  header {
+    padding: 28px 24px 20px;
+    border-bottom: 2px solid var(--ink);
+  }
+  header .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--clinical-green-dark);
+  }
+  header h1 {
+    margin: 4px 0 2px;
+    font-size: 28px;
+    letter-spacing: -0.01em;
+  }
+  header p {
+    margin: 0;
+    font-size: 14px;
+    color: #56605b;
+    max-width: 60ch;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #56605b;
+    margin-bottom: 6px;
+  }
+  textarea, select, input[type="text"] {
+    width: 100%;
+    font-family: 'Georgia', serif;
+    font-size: 15px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: #fff;
+    color: var(--ink);
+  }
+  textarea { min-height: 90px; resize: vertical; }
+  .row { margin-bottom: 16px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .photo-input {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .photo-input input[type="file"] { display: none; }
+  .photo-btn {
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 10px 16px;
+    background: var(--clinical-green);
+    color: white;
+    border-radius: 3px;
+    cursor: pointer;
+    border: none;
+  }
+  #preview {
+    max-width: 80px;
+    max-height: 80px;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+    display: none;
+    object-fit: cover;
+  }
+
+  button#submit {
+    width: 100%;
+    padding: 14px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 14px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  button#submit:disabled { opacity: 0.5; cursor: wait; }
+
+  .severity-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 3px;
+    color: white;
+  }
+  .sev-low { background: var(--clinical-green); }
+  .sev-moderate { background: var(--alert-amber); }
+  .sev-high, .sev-emergency { background: var(--alert-red); }
+
+  .result-section { margin-top: 14px; }
+  .result-section h3 {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #56605b;
+    margin: 0 0 6px;
+  }
+  ul.flags { margin: 0; padding-left: 20px; }
+  ul.flags li { color: var(--alert-red); font-weight: bold; }
+
+  .translated-box {
+    background: #f0efe7;
+    border-left: 3px solid var(--clinical-green);
+    padding: 12px 14px;
+    margin-top: 10px;
+    font-style: italic;
+  }
+  .confidence-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #56605b;
+  }
+
+  #status {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: #56605b;
+    margin-top: 10px;
+  }
+  #error {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--alert-red);
+    margin-top: 10px;
+  }
+  .divider { border: none; border-top: 1px solid var(--line); margin: 16px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Ilera · Community Health Triage</div>
+  <h1>Field Triage Assistant</h1>
+  <p>Describe symptoms, attach a photo if relevant, and get a structured triage assessment — in English, Hausa, or Yoruba.</p>
+</header>
+
+<main>
+  <div class="card">
+    <div class="row">
+      <label for="patient_ref">Patient reference</label>
+      <input type="text" id="patient_ref" value="Patient A" />
+    </div>
+
+    <div class="row">
+      <label for="symptom_text">Symptoms / observations</label>
+      <textarea id="symptom_text" placeholder="e.g. Swelling on right forearm, warm to touch, started 3 days ago, mild fever reported"></textarea>
+    </div>
+
+    <div class="two-col row">
+      <div>
+        <label for="language">Output language</label>
+        <select id="language">
+          <option value="en">English</option>
+          <option value="ha">Hausa</option>
+          <option value="yo">Yoruba</option>
+        </select>
+      </div>
+      <div>
+        <label>Photo (optional)</label>
+        <div class="photo-input">
+          <label class="photo-btn" for="image">Attach photo</label>
+          <input type="file" id="image" accept="image/*" capture="environment" />
+          <img id="preview" />
+        </div>
+      </div>
+    </div>
+
+    <button id="submit">Run triage</button>
+    <div id="status"></div>
+    <div id="error"></div>
+  </div>
+
+  <div class="card" id="results" style="display:none;">
+    <div class="result-section">
+      <h3>Severity</h3>
+      <span id="severity" class="severity-badge">—</span>
+    </div>
+
+    <div class="result-section">
+      <h3>Likely conditions</h3>
+      <div id="conditions">—</div>
+    </div>
+
+    <div class="result-section">
+      <h3>Red flags</h3>
+      <ul class="flags" id="redflags"></ul>
+    </div>
+
+    <div class="result-section">
+      <h3>Recommended action</h3>
+      <div id="action">—</div>
+    </div>
+
+    <div class="result-section" id="translationSection" style="display:none;">
+      <h3>Local language output</h3>
+      <div class="translated-box" id="translatedText"></div>
+      <div class="confidence-tag" id="confidenceTag"></div>
+    </div>
+
+    <hr class="divider" />
+
+    <div class="result-section">
+      <h3>Referral note (auto-generated)</h3>
+      <div id="referralNote"></div>
+    </div>
+
+    <div class="result-section" id="followUpSection" style="display:none;">
+      <h3>Follow-up scheduled</h3>
+      <div id="followUp"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const imageInput = document.getElementById('image');
+const preview = document.getElementById('preview');
+
+imageInput.addEventListener('change', () => {
+  const file = imageInput.files[0];
+  if (file) {
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+  }
+});
+
+document.getElementById('submit').addEventListener('click', async () => {
+  const btn = document.getElementById('submit');
+  const statusEl = document.getElementById('status');
+  const errorEl = document.getElementById('error');
+  const resultsEl = document.getElementById('results');
+
+  errorEl.textContent = '';
+  resultsEl.style.display = 'none';
+
+  const symptomText = document.getElementById('symptom_text').value.trim();
+  if (!symptomText) {
+    errorEl.textContent = 'Please describe the symptoms first.';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('symptom_text', symptomText);
+  formData.append('language', document.getElementById('language').value);
+  formData.append('patient_ref', document.getElementById('patient_ref').value || 'Patient');
+  if (imageInput.files[0]) {
+    formData.append('image', imageInput.files[0]);
+  }
+
+  btn.disabled = true;
+  statusEl.textContent = 'Running triage… (calling Gemma)';
+
+  try {
+    const resp = await fetch('/api/triage', { method: 'POST', body: formData });
+    if (!resp.ok) {
+      const errBody = await resp.json().catch(() => ({}));
+      throw new Error(errBody.detail || `Request failed: ${resp.status}`);
+    }
+    const data = await resp.json();
+    renderResults(data);
+    statusEl.textContent = 'Done.';
+  } catch (e) {
+    errorEl.textContent = e.message;
+    statusEl.textContent = '';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function renderResults(data) {
+  const t = data.triage;
+  const resultsEl = document.getElementById('results');
+  resultsEl.style.display = 'block';
+
+  const sevEl = document.getElementById('severity');
+  sevEl.textContent = t.severity;
+  sevEl.className = 'severity-badge sev-' + t.severity;
+
+  document.getElementById('conditions').textContent =
+    (t.likely_conditions && t.likely_conditions.length) ? t.likely_conditions.join(', ') : 'Unclear from available info';
+
+  const flagsEl = document.getElementById('redflags');
+  flagsEl.innerHTML = '';
+  (t.red_flags || []).forEach(f => {
+    const li = document.createElement('li');
+    li.textContent = f;
+    flagsEl.appendChild(li);
+  });
+  if (!t.red_flags || t.red_flags.length === 0) {
+    flagsEl.innerHTML = '<li style="color:#56605b;font-weight:normal;">None noted</li>';
+  }
+
+  document.getElementById('action').textContent = t.recommended_action;
+
+  const translationSection = document.getElementById('translationSection');
+  if (data.translation) {
+    translationSection.style.display = 'block';
+    document.getElementById('translatedText').innerHTML =
+      '<strong>' + data.translation.translated_summary + '</strong><br/><br/>' +
+      data.translation.translated_recommended_action;
+    document.getElementById('confidenceTag').textContent =
+      'Translation confidence: ' + data.translation.translation_confidence.toUpperCase();
+  } else {
+    translationSection.style.display = 'none';
+  }
+
+  const referral = data.referral;
+  document.getElementById('referralNote').innerHTML =
+    '<p>' + referral.patient_summary + '</p>' +
+    '<p><strong>Recommendation:</strong> ' + referral.facility_recommendation + '</p>';
+
+  const followUpSection = document.getElementById('followUpSection');
+  if (data.follow_up_event) {
+    followUpSection.style.display = 'block';
+    document.getElementById('followUp').textContent =
+      'Follow-up due ' + data.follow_up_event.due_date + ' at ' + data.follow_up_event.facility;
+  } else {
+    followUpSection.style.display = 'none';
+  }
+}
+</script>
+
+</body>
+</html>
