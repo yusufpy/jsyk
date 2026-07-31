@@ -77,6 +77,19 @@ def _extract_answer_text(data: dict) -> str:
             f"Gemma returned only thinking content, no final answer. Raw: {data}"
         )
     return text
+
+def _strip_markdown_fence(text: str) -> str:
+    """
+    Gemma occasionally wraps or trails JSON output with markdown code fences
+    (``` or ```json) even when responseMimeType=application/json is set.
+    This strips them so json.loads doesn't choke on trailing "Extra data".
+    """
+    t = text.strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[1] if "\n" in t else t[3:]
+    if t.rstrip().endswith("```"):
+        t = t.rstrip()[:-3]
+    return t.strip()
 def _call_gemini(parts: list, response_schema: dict) -> dict:
     if not GEMMA_API_KEY:
         raise GemmaClientError(
@@ -104,7 +117,7 @@ def _call_gemini(parts: list, response_schema: dict) -> dict:
         raise GemmaClientError(f"Gemma API error {resp.status_code}: {resp.text}")
 
     data = resp.json()
-    text = _extract_answer_text(data)
+    text = _strip_markdown_fence(_extract_answer_text(data)) #text = _extract_answer_text(data)
     try:
         text = data["candidates"][0]["content"]["parts"][0]["text"]
         return json.loads(text)
