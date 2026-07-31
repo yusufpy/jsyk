@@ -18,7 +18,7 @@ GEMMA_API_KEY = "AQ.Ab8RN6KKlbrXlgsHn6ZxUMHXGjgzqpqHbongXco2ALMuk5J_Jw"#os.envir
 # can access, then set GEMMA_MODEL to that exact string in .env.
 # Gemma 4 sizes are named by capability (E2B, E4B, 12B, 26B MoE, 31B dense),
 # not by parameter count like Gemma 3 was -- don't guess this string.
-MODEL = "gemma-4-12B-it"#os.environ.get("GEMMA_MODEL", "gemma-3-27b-it")
+MODEL = os.environ.get("GEMMA_MODEL", "gemma-4-31b-it")
 BASE_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
 REQUEST_TIMEOUT = int(os.environ.get("GEMMA_TIMEOUT_SECONDS", "120"))
 
@@ -56,7 +56,27 @@ SYSTEM_INSTRUCTION = (
 class GemmaClientError(Exception):
     pass
 
+def _extract_answer_text(data: dict) -> str:
+    """
+    Gemma 4 emits internal reasoning as separate parts marked "thought": true
+    before the actual answer part. There's a known bug where
+    generationConfig.thinkingConfig.includeThoughts=false is silently ignored
+    for gemma-4-31b-it, so we can't rely on suppressing thoughts server-side --
+    we filter them out here instead, regardless of what the config says.
+    """
+    try:
+        parts = data["candidates"][0]["content"]["parts"]
+    except (KeyError, IndexError) as e:
+        raise GemmaClientError(f"Unexpected Gemma response shape: {e}\nRaw: {data}")
 
+    answer_parts = [p.get("text", "") for p in parts if not p.get("thought", False)]
+    text = "".join(answer_parts).strip()
+
+    if not text:
+        raise GemmaClientError(
+            f"Gemma returned only thinking content, no final answer. Raw: {data}"
+        )
+    return text
 def _call_gemini(parts: list, response_schema: dict) -> dict:
     if not GEMMA_API_KEY:
         raise GemmaClientError(
@@ -84,6 +104,7 @@ def _call_gemini(parts: list, response_schema: dict) -> dict:
         raise GemmaClientError(f"Gemma API error {resp.status_code}: {resp.text}")
 
     data = resp.json()
+    text = _extract_answer_text(data)
     try:
         text = data["candidates"][0]["content"]["parts"][0]["text"]
         return json.loads(text)
@@ -124,7 +145,11 @@ def translate_text(text: str, target_language_name: str) -> str:
             "text": (
                 f"Translate the following clinical guidance into {target_language_name}. "
                 "Keep it simple, direct, and appropriate for a community health worker "
-                "to read aloud to a patient. Return ONLY the translation, nothing else.\n\n"
+                "to read aloud to a patient. "
+                "Output ONLY the final translated sentence(s) -- no draft options, "
+                "no alternate phrasings, no explanation of word choices, no notes "
+                "in parentheses about translation difficulty. Just the clean text "
+                "a health worker would read aloud, nothing else.\n\n"
                 f"Text: {text}"
             )
         }
@@ -142,4 +167,5 @@ def translate_text(text: str, target_language_name: str) -> str:
     if resp.status_code != 200:
         raise GemmaClientError(f"Gemma API error {resp.status_code}: {resp.text}")
     data = resp.json()
-    return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    print(f"[DEBUG] translate_text raw response: {json.dumps(data, ensure_ascii=False)}", flush=True)
+    return _extract_answer_text(data)

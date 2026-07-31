@@ -38,6 +38,7 @@ async def triage(
     patient_ref: str = Form("Patient"),
     image: UploadFile | None = File(None),
 ):
+    print(f"[DEBUG] language received from form: {repr(language)}", flush=True)
     image_bytes = None
     image_mime = "image/jpeg"
     if image is not None:
@@ -68,6 +69,7 @@ async def triage(
             translated = translate.translate_triage_output(result, language)
             response["translation"] = translated
         except gemma_client.GemmaClientError as e:
+            print(f"[DEBUG] Translation failed: {e}", flush=True)
             response["translation_error"] = str(e)
 
     note = agent.build_referral_note(result, patient_ref)

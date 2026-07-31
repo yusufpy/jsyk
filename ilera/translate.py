@@ -48,6 +48,7 @@ def translate_triage_output(triage: dict, language_code: str) -> dict:
 
     Returns a dict matching schema.TranslatedTriageResult.
     """
+    print(f"[DEBUG] translate_triage_output called with language_code={repr(language_code)}", flush=True)
     if language_code not in LANGUAGE_NAMES:
         raise ValueError(f"Unsupported language code: {language_code}")
 
