@@ -13,7 +13,7 @@ import json
 import os
 import requests
 
-GEMMA_API_KEY = "AQ.Ab8RN6KKlbrXlgsHn6ZxUMHXGjgzqpqHbongXco2ALMuk5J_Jw"#os.environ.get("GEMMA_API_KEY", "")
+GEMMA_API_KEY = os.environ.get("GEMMA_API_KEY", "")
 # IMPORTANT: run list_models.py first to see which exact model IDs your key
 # can access, then set GEMMA_MODEL to that exact string in .env.
 # Gemma 4 sizes are named by capability (E2B, E4B, 12B, 26B MoE, 31B dense),
